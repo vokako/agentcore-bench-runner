@@ -4,3 +4,5 @@ config.*.json
 __pycache__/
 .venv/
 *.log
+runs/
+vendor/

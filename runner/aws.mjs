@@ -24,7 +24,22 @@ if (cmd === 'put') {
   await ac.send(new StopRuntimeSessionCommand({
     agentRuntimeArn: env.BENCH_RUNTIME_ARN, runtimeSessionId: env.BENCH_SESSION_ID, qualifier: 'DEFAULT',
   }));
+} else if (cmd === 'secret') {
+  // Print one Secrets Manager secret string (used by harnesses that need an API key).
+  // The SDK is installed only by harnesses that use this, so it is imported lazily.
+  const { SecretsManagerClient, GetSecretValueCommand } = await import('@aws-sdk/client-secrets-manager');
+  const sm = new SecretsManagerClient({ region: env.BENCH_REGION });
+  // "<id>:<STAGE>" picks a version stage (e.g. bench/kiro-api-key:KEY1); plain "<id>" is AWSCURRENT.
+  const [id, stage] = a.split(':');
+  const r = await sm.send(new GetSecretValueCommand({ SecretId: id, ...(stage ? { VersionStage: stage } : {}) }));
+  process.stdout.write(r.SecretString);
+} else if (cmd === 'bedrock-token') {
+  // Print a short-term Bedrock API key minted from the execution role, for clients that
+  // only speak bearer auth to bedrock-runtime's OpenAI-compatible endpoint (e.g. Codex).
+  // Installed only by harnesses that use it, so imported lazily.
+  const { getTokenProvider } = await import('@aws/bedrock-token-generator');
+  process.stdout.write(await getTokenProvider({ region: a || env.BENCH_MODEL_REGION || env.BENCH_REGION })());
 } else {
-  console.error('usage: aws.mjs put|get <key> <file> | stop');
+  console.error('usage: aws.mjs put|get <key> <file> | stop | secret <id>');
   process.exit(2);
 }

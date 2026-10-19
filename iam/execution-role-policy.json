@@ -21,7 +21,10 @@
       ],
       "Resource": [
         "arn:aws:bedrock:*::foundation-model/anthropic.*",
-        "arn:aws:bedrock:*:*:inference-profile/us.anthropic.*"
+        "arn:aws:bedrock:*::foundation-model/openai.*",
+        "arn:aws:bedrock:*:*:inference-profile/us.anthropic.*",
+        "arn:aws:bedrock:*:*:inference-profile/global.anthropic.*",
+        "arn:aws:bedrock:*:*:inference-profile/global.openai.*"
       ]
     },
     {

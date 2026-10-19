@@ -1,0 +1,25 @@
+# Harness x model sweep used for docs/results/tb2-50-matrix.md.
+# One row per agent + model; scripts/sweep.sh runs every row at low, medium and high effort
+# on both task lists (benchmarks/tb2-fast30.txt + benchmarks/tb2-hard20.txt = 50 tasks).
+# Run directories are named runs/<subset>-<name>-<effort>, e.g. runs/fast30-cc-sonnet55-high.
+#
+# Columns (tab or spaces): name  harness  model  [KEY=VALUE env for that row]
+# Claude Code and Codex call Bedrock global cross-region inference profiles.
+# kiro-cli uses Kiro model ids and the Kiro API key in Secrets Manager (BENCH_KIRO_SECRET).
+cc-haiku55        claude-code  global.anthropic.claude-haiku-5-5
+cc-sonnet55       claude-code  global.anthropic.claude-sonnet-5-5
+cc-opus55         claude-code  global.anthropic.claude-opus-5-5
+cc-sonnet5        claude-code  global.anthropic.claude-sonnet-5
+cc-opus5          claude-code  global.anthropic.claude-opus-5
+codex-gpt61sol    codex        global.openai.gpt-6.1-sol
+codex-gpt56sol    codex        global.openai.gpt-5.6-sol
+codex-gpt56terra  codex        global.openai.gpt-5.6-terra
+codex-gpt6luna    codex        global.openai.gpt-6-luna
+kiro-sonnet55     kiro-cli     claude-sonnet-5.5
+kiro-opus55       kiro-cli     claude-opus-5.5
+kiro-sonnet5      kiro-cli     claude-sonnet-5
+kiro-opus5        kiro-cli     claude-opus-5
+kiro-gpt56sol     kiro-cli     gpt-5.6-sol
+kiro-gpt56terra   kiro-cli     gpt-5.6-terra
+kimicode-k3       kimi-code    global.moonshotai.kimi-k3
+kiro-kimik3       kiro-cli     kimi-k3
