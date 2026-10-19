@@ -1,5 +1,5 @@
-# Installs Claude Code inside the task sandbox.
-# Only adds Node.js (under /opt/bench-node) and the Claude Code CLI; the task environment
+# Common install inside the task sandbox; the harness's own install.sh is appended.
+# Only adds Node.js (under /opt/bench-node), the in-sandbox AWS helper and the harness; the task environment
 # is otherwise untouched. No package manager is used: in Runtime Instances mode the
 # container runs as root with no Linux capabilities, so apt cannot switch users.
 set -e
@@ -39,9 +39,10 @@ fi
 export PATH=/opt/bench-node/bin:$PATH
 
 quiet() { "$@" > /tmp/.bench-npm.log 2>&1 || { tail -20 /tmp/.bench-npm.log; return 1; }; }
-quiet npm install -g --silent @anthropic-ai/claude-code
 # AWS SDK for the in-sandbox helper (runner/aws.mjs): S3 upload/download, stop session.
 mkdir -p /opt/bench && cd /opt/bench
 [ -f package.json ] || quiet npm init -y
 quiet npm install --silent @aws-sdk/client-s3 @aws-sdk/client-bedrock-agentcore
-echo "node=$(node --version) claude=$(claude --version 2>/dev/null | head -1)"
+echo "node=$(node --version)"
+cd /
+# Harness-specific install is appended here by bench.py (runner/harnesses/<name>/install.sh).

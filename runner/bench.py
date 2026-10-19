@@ -237,7 +237,45 @@ def check_capacity_provider(cfg, trial_s):
                          "mid-trial. Set idleInstanceTimeout >= the longest trial; see docs/limitations.md")
 
 
-def submit(cfg, mode, task_dir, image):
+def harness_dir(harness):
+    d = os.path.join(HERE, "harnesses", harness)
+    if not os.path.isfile(os.path.join(d, "agent.sh")):
+        names = sorted(os.listdir(os.path.join(HERE, "harnesses")))
+        raise SystemExit(f"unknown harness {harness!r}; available: {', '.join(names)}")
+    return d
+
+
+def harness_version_from(install_out):
+    """Version line printed by harnesses/<h>/install.sh, e.g. 'claude=2.3.1 (Claude Code)' -> '2.3.1'."""
+    for line in reversed(install_out.splitlines()):
+        m = re.match(r"\s*(?:claude|codex|kiro|kimi|qoder|codebuddy)=(\S*(?:\s+\S+)*)", line)
+        if m:
+            v = re.search(r"\d+\.\d+[\w.\-+]*", m.group(1))
+            return v.group(0) if v else m.group(1).strip()
+    return ""
+
+
+def install_script(harness, cfg=None):
+    """Common install (Node + AWS helper) followed by the harness's own install.sh."""
+    common = open(os.path.join(HERE, "install.sh")).read()
+    # Optional harness version pins, e.g. BENCH_KIRO_VERSION=2.29.0. Each install.sh has a pinned default
+    # (the version the published results used); these override it.
+    pin = "".join(f"export {k}={json.dumps(os.environ[k])}\n"
+                  for k in ("BENCH_KIRO_VERSION", "BENCH_KIMI_VERSION", "BENCH_QODER_VERSION", "BENCH_CODEBUDDY_VERSION",
+                            "BENCH_CLAUDE_VERSION", "BENCH_CODEX_VERSION") if os.environ.get(k))
+    # Harnesses installed from a pinned bundle in the results bucket (s3://<bucket>/<prefix>/artifacts/...)
+    # read it with aws.mjs during install, before /bench/env exists, so the bucket is exported here.
+    if cfg:
+        pin += (f"export BENCH_BUCKET={json.dumps(cfg['results_bucket'])}\n"
+                f"export BENCH_S3_REGION={json.dumps(cfg['results_region'])}\n"
+                f"export BENCH_ARTIFACTS={json.dumps(cfg.get('results_prefix', 'bench-runner') + '/artifacts')}\n")
+        # aws.mjs is normally shipped at trial launch; install needs it earlier for bundle downloads.
+        helper = base64.b64encode(open(os.path.join(HERE, "aws.mjs"), "rb").read()).decode()
+        pin += f"mkdir -p /opt/bench && echo {helper} | base64 -d > /opt/bench/aws.mjs\n"
+    return pin + common + "\n" + open(os.path.join(harness_dir(harness), "install.sh")).read()
+
+
+def submit(cfg, mode, task_dir, image, harness="claude-code", model=None, model_region=None, effort=None):
     task = load_task(task_dir)
     run_id = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" + uuid.uuid4().hex[:6]
     base = cfg.get("results_prefix", "bench").strip("/")
@@ -267,7 +305,7 @@ def submit(cfg, mode, task_dir, image):
 
     # 1. install the agent (synchronous, so an install failure is reported right here)
     t0 = time.time()
-    code, out = run_command(data, sandbox.arn, session_id, open(os.path.join(HERE, "install.sh")).read())
+    code, out = run_command(data, sandbox.arn, session_id, install_script(harness, cfg))
     t_install = time.time() - t0
     if code is None and not out:
         raise SystemExit("the session returned no output. On microVM this is what an image looks like "
@@ -275,25 +313,42 @@ def submit(cfg, mode, task_dir, image):
                          "uncompressed; see docs/large-images.md")
     if code != 0:
         raise SystemExit(f"agent install failed (exit {code}):\n{out[-2000:]}")
+    harness_version = harness_version_from(out)
 
     # 2. hand the trial to the sandbox and return
     env = {
         "BENCH_RUN_ID": run_id, "BENCH_TASK": task["name"], "BENCH_MODE": mode,
-        "BENCH_MODEL": cfg["model_id"], "BENCH_REGION": cfg["region"],
+        "BENCH_HARNESS": harness, "BENCH_MODEL": model or cfg["model_id"], "BENCH_REGION": cfg["region"],
+        "BENCH_MODEL_REGION": model_region or cfg["region"],
+        "BENCH_EFFORT": effort or "",
+        "BENCH_HARNESS_VERSION": harness_version,
         "BENCH_BUCKET": cfg["results_bucket"], "BENCH_S3_REGION": cfg["results_region"],
         "BENCH_PREFIX": run_prefix, "BENCH_INPUT_PREFIX": input_prefix,
         "BENCH_RUNTIME_ARN": sandbox.arn, "BENCH_SESSION_ID": session_id,
         "BENCH_WORKDIR": task["workdir"],
-        "BENCH_AGENT_TIMEOUT": str(task["agent_timeout"]),
+        # BENCH_AGENT_TIMEOUT_OVERRIDE shortens the agent timeout (e.g. to test timeout handling).
+        "BENCH_AGENT_TIMEOUT": os.environ.get("BENCH_AGENT_TIMEOUT_OVERRIDE") or str(task["agent_timeout"]),
         "BENCH_VERIFIER_TIMEOUT": str(task["verifier_timeout"]),
     }
+    if os.environ.get("BENCH_KIRO_SECRET"):  # secret name, optionally "<id>:<STAGE>" (kiro-cli only)
+        env["BENCH_KIRO_SECRET"] = os.environ["BENCH_KIRO_SECRET"]
+    # Optional steering / system-prompt file for the harness (kiro-cli: installed as global steering).
+    steering_path = os.environ.get("BENCH_STEERING") or ""
+    steering = os.path.splitext(os.path.basename(steering_path))[0] if steering_path else ""
+    if steering:
+        env["BENCH_STEERING"] = steering
     files = {
         "/bench/env": "".join(f"export {k}={json.dumps(v)}\n" for k, v in env.items()),
         "/bench/instruction.md": task["instruction"],
         "/bench/trial.sh": open(os.path.join(HERE, "trial.sh")).read(),
-        "/bench/agent.sh": open(os.path.join(HERE, "agent.sh")).read(),
+        "/bench/agent.sh": open(os.path.join(harness_dir(harness), "agent.sh")).read(),
         "/opt/bench/aws.mjs": open(os.path.join(HERE, "aws.mjs")).read(),
     }
+    if steering:
+        files["/bench/steering.md"] = open(steering_path).read()
+    usage_sh = os.path.join(harness_dir(harness), "usage.sh")
+    if os.path.isfile(usage_sh):
+        files["/bench/usage.sh"] = open(usage_sh).read()
     lines = ["set -e", "mkdir -p /bench /opt/bench"]
     for path, body in files.items():
         lines.append(f"echo {base64.b64encode(body.encode()).decode()} | base64 -d > {path}")
@@ -305,6 +360,8 @@ def submit(cfg, mode, task_dir, image):
         raise SystemExit(f"trial launch failed (exit {code}):\n{out[-2000:]}")
 
     record = {"run_id": run_id, "task": task["name"], "mode": mode, "image": image,
+              "harness": harness, "harness_version": harness_version,
+              "model": env["BENCH_MODEL"], "effort": env["BENCH_EFFORT"], "steering": steering,
               "image_bytes": image_bytes, "sandbox": sandbox.name, "sandbox_reused": reused, "session_id": session_id,
               "timings_s": {"sandbox": round(t_sandbox, 1), "install": round(t_install, 1)},
               "results": f"s3://{cfg['results_bucket']}/{run_prefix}/",
@@ -368,6 +425,10 @@ def main():
     s.add_argument("--mode", choices=["microvm", "instances"], required=True)
     s.add_argument("--task", required=True, help="Harbor task directory")
     s.add_argument("--image", required=True, help="task image URI in ECR")
+    s.add_argument("--harness", default="claude-code", help="runner/harnesses/<name>")
+    s.add_argument("--model", help="model / inference profile for the harness (default: config model_id)")
+    s.add_argument("--effort", help="reasoning effort passed to the harness (e.g. high); empty = harness default")
+    s.add_argument("--model-region", help="region the harness calls the model in (default: config region)")
     r = sub.add_parser("results", help="read a trial's results from S3")
     r.add_argument("run_id")
     r.add_argument("--wait", type=int, default=0, help="seconds to wait for completion")
@@ -376,7 +437,7 @@ def main():
     cfg = json.load(open(args.config))
     cfg.setdefault("results_region", cfg["region"])
     if args.cmd == "submit":
-        submit(cfg, args.mode, args.task, args.image)
+        submit(cfg, args.mode, args.task, args.image, args.harness, args.model, args.model_region, args.effort)
     elif args.cmd == "results":
         sys.exit(0 if results(cfg, args.run_id, args.wait) else 3)
     else:

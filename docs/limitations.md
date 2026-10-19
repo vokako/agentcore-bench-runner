@@ -95,3 +95,23 @@
 
 - Claude Code 在 root 下会拒绝 `bypassPermissions`，设置 `IS_SANDBOX=1` 后可以运行（实测）。不要降权到普通用户：需要修改系统目录的任务会因此失败，看起来像模型能力不足（实测）。
 - 会话内 AWS 相关环境变量全为空，SDK 通过 IMDSv2 取得执行角色凭证（实测）。沙箱内所有进程（包括 agent）共享同一执行角色，所以执行角色只授予：模型调用、拉取镜像、读 `inputs/`、写 `runs/`、停止会话（见 [iam/execution-role-policy.json](../iam/execution-role-policy.json)）。
+
+## Usage accounting when the agent is cut off
+
+`trial.sh` runs `harnesses/<h>/usage.sh` after the agent however it ended, so a timeout kill no longer
+skips the usage summary. `usage_source` in `summary.json` says where the numbers came from.
+
+| Harness | What survives a timeout | How |
+|---|---|---|
+| Claude Code | Tokens | `--output-format stream-json` plus Claude Code's session transcript. The stream's `output_tokens` is the count at the start of each message (2-8), so the final count is taken from the transcript (`usage_source: stream+transcript`). In a 90 s probe the stream said 37 output tokens and the transcript 2866. |
+| Codex | Tokens | The last cumulative `token_count` in Codex's rollout file (`usage_source: rollout`), when no `turn.completed` event was written. |
+| kiro-cli | Nothing | kiro-cli reports credits (`metadata.meteringUsage`) only when a turn ends, and a headless run is one turn. SIGINT makes it exit without reporting, and neither its session files nor its logs record credits. Probed with 30 s timeouts. |
+
+For kiro-cli the credits of a timed-out trial cannot be recovered, so a job's cost is a lower bound when
+it contains such trials. Estimating from context size was tried and rejected: on completed trials the
+held-out error of the summed estimate was 8-50% by model, and 20-90% per trial.
+
+`scripts/recompute_usage.py` re-reads the event streams of existing kiro-cli runs and fills in credits
+that are in the stream but were never summarized.
+
+Each trial also uploads `session-logs.tgz` (the agent's own session files) and `usage.json`.

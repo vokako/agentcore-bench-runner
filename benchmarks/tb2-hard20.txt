@@ -1,0 +1,25 @@
+# TB2-Hard20: 20 Terminal-Bench 2.0 tasks to separate harnesses/models that tie on Fast30.
+# Picked from round 1/2 microVM results (docs/results/round{1,2}-microvm.md): no environment
+# failures (image cap, disk, port 8080, lost), not in Fast30, and either failed by the agent
+# or flipped between rounds, plus a few hard tasks that pass. Agent timeout <= 1800 s except
+# reshard-c4-data, video-processing, circuit-fibsqrt, bn-fit-modify (3600 s; past agent time 220-740 s).
+break-filter-js-from-html
+filter-js-from-html
+crack-7z-hash
+feal-differential-cryptanalysis
+feal-linear-cryptanalysis
+dna-assembly
+dna-insert
+protein-assembly
+query-optimize
+reshard-c4-data
+cancel-async-tasks
+make-mips-interpreter
+write-compressor
+circuit-fibsqrt
+path-tracing-reverse
+extract-moves-from-video
+video-processing
+tune-mjcf
+bn-fit-modify
+llm-inference-batching-scheduler

@@ -1,0 +1,11 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OpenAIModelsViaBedrockMantle",
+      "Effect": "Allow",
+      "Action": ["bedrock-mantle:CreateInference"],
+      "Resource": "arn:aws:bedrock-mantle:*:<account-id>:project/default"
+    }
+  ]
+}

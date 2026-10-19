@@ -36,7 +36,7 @@ def submit_one(cfg, mode, task_dir, image):
     if size is None:
         return {**row, "status": "no-image", "error": "image not found in ECR"}
     try:
-        rec = bench.submit(cfg, mode, task_dir, image)
+        rec = bench.submit(cfg, mode, task_dir, image, cfg.get("harness", "claude-code"), cfg.get("model"), cfg.get("model_region"), cfg.get("effort"))
         return {**row, **rec, "status": "submitted"}
     except SystemExit as exc:  # bench.submit reports expected failures this way
         return {**row, "image_bytes": size, "status": "submit-failed", "error": str(exc)[-600:]}
@@ -119,10 +119,16 @@ def main():
     ap.add_argument("--jobs", type=int, default=8, help="trials in flight at a time")
     ap.add_argument("--margin", type=int, default=1800, help="seconds added to each task's timeouts")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--harness", default="claude-code", help="runner/harnesses/<name>")
+    ap.add_argument("--model", help="model / inference profile for the harness")
+    ap.add_argument("--effort", help="reasoning effort passed to the harness (e.g. high)")
+    ap.add_argument("--model-region", help="region the harness calls the model in")
     ap.add_argument("tasks", nargs="+", help="Harbor task directories")
     args = ap.parse_args()
     cfg = json.load(open(args.config))
     cfg.setdefault("results_region", cfg["region"])
+    cfg["harness"], cfg["model"], cfg["model_region"], cfg["effort"] = args.harness, args.model, args.model_region, args.effort
+    bench.harness_dir(args.harness)  # fail fast on an unknown harness
     os.makedirs(args.out, exist_ok=True)
 
     lock = threading.Lock()

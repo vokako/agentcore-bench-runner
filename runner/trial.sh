@@ -48,13 +48,18 @@ finish() {
   writable_out
   T_END=$(now)
   [ -f /logs/verifier/reward.json ] && REWARD_JSON=$(cat /logs/verifier/reward.json) || REWARD_JSON=null
+  USAGE=null
+  [ -s /bench/usage.json ] && node -e 'JSON.parse(require("fs").readFileSync("/bench/usage.json","utf8"))' 2>/dev/null && USAGE=$(cat /bench/usage.json)
   [ -f /logs/verifier/reward.txt ] && REWARD=$(tr -d ' \n' < /logs/verifier/reward.txt)
   cat > "$OUT/summary.json" <<EOF
 {
   "run_id": "$BENCH_RUN_ID",
   "task": "$BENCH_TASK",
   "mode": "$BENCH_MODE",
+  "harness": "${BENCH_HARNESS:-}",
+  "harness_version": "${BENCH_HARNESS_VERSION:-}",
   "model": "$BENCH_MODEL",
+  "usage": $USAGE,
   "reward": ${REWARD:-null},
   "reward_json": $REWARD_JSON,
   "agent_exit": ${AGENT_EXIT:-null},
@@ -66,6 +71,11 @@ finish() {
 }
 EOF
   s3put agent.log /bench/agent.log
+  s3put agent.json /bench/agent.json
+  s3put agent.jsonl /bench/agent.jsonl
+  s3put session-logs.tgz /bench/session-logs.tgz
+  s3put usage.json /bench/usage.json
+  s3put kiro-metering.log /bench/kiro-metering.log
   s3put verifier.log /bench/verifier.log
   s3put reward.txt /logs/verifier/reward.txt
   s3put reward.json /logs/verifier/reward.json
@@ -104,9 +114,21 @@ write_status agent
 mkdir -p /logs/agent /logs/verifier
 cd "$BENCH_WORKDIR" 2>/dev/null || cd /
 A0=$(now)
-timeout "$BENCH_AGENT_TIMEOUT" bash /bench/agent.sh > /bench/agent.log 2>&1
+# On timeout: TERM, then KILL 30 s later.
+timeout -k 30 "$BENCH_AGENT_TIMEOUT" bash /bench/agent.sh > /bench/agent.log 2>&1
 AGENT_EXIT=$?; T_AGENT=$(( $(now) - A0 ))
 [ "$AGENT_EXIT" = 124 ] && ERROR="agent timed out after ${BENCH_AGENT_TIMEOUT}s"
+
+# Usage is extracted here, not inside agent.sh, so a timed-out or killed agent still gets counted.
+# The agent's own session files (tokens / credits as the agent wrote them) are kept for re-checking.
+if [ -f /bench/usage.sh ]; then
+  timeout 120 bash /bench/usage.sh >> /bench/agent.log 2>> /bench/trial.log
+fi
+find /root/.kiro /root/.claude /opt/bench/codex-home/sessions /opt/bench/kimi-home/sessions /root/.qoder-cn/projects /root/.codebuddy/projects -type f -newer /bench/env -size -50M \
+     \( -name '*.jsonl' -o -name '*.json' \) 2>/dev/null | head -200 > /bench/session-files.txt
+find /tmp /root/.local/share /root/.cache -type f -newer /bench/env -size -20M -name '*.log' 2>/dev/null \
+     | grep -i kiro | head -20 >> /bench/session-files.txt
+[ -s /bench/session-files.txt ] && tar -czf /bench/session-logs.tgz -T /bench/session-files.txt 2>/dev/null
 
 # Tests are fetched only now, after the agent has exited.
 write_status verifier

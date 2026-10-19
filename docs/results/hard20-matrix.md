@@ -1,0 +1,23 @@
+| task | hard20-cc-haiku55-high | hard20-cc-opus55-high | hard20-cc-sonnet55-high | hard20-cc-sonnet55-low | hard20-codex-gpt61sol-high | hard20-codex-gpt61sol-low | hard20-kiro-gpt56sol-high | hard20-kiro-gpt56sol-low | hard20-kiro-opus55-high | hard20-kiro-sonnet55-high |
+|---|---|---|---|---|---|---|---|---|---|---|
+| bn-fit-modify | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| break-filter-js-from-html | 1 | R | R | R | 0 | 0 | R | R | R | R |
+| cancel-async-tasks | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| circuit-fibsqrt | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| crack-7z-hash | 1 | R | R | R | 1 | 1 | 1 | 1 | R | R |
+| dna-assembly | 0 | R | 1 | 1 | 1 | 1 | 1 | 0 | R | 1 |
+| dna-insert | 0 | R | 0 | 0 | 1 | 1 | 0 | 0 | R | 0 |
+| extract-moves-from-video | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 0 | 0 |
+| feal-differential-cryptanalysis | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| feal-linear-cryptanalysis | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 |
+| filter-js-from-html | 0 | R | 0 | 0 | 0 | 0 | 0 | 0 | R | 0 |
+| llm-inference-batching-scheduler | 1 | 1 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 1 |
+| make-mips-interpreter | 0 | 1 | 0 | 0 | 1 | 1 | 0 | 1 | 1 | 0 |
+| path-tracing-reverse | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| protein-assembly | 0 | R | 1 | 1 | 0 | 0 | 0 | 0 | R | 1 |
+| query-optimize | 1 | 1 | 1 | 0 | 1 | 1 | 1 | 0 | 1 | 1 |
+| reshard-c4-data | - | 1 | 1 | - | 1 | 1 | 1 | 0 | 1 | 1 |
+| tune-mjcf | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| video-processing | 1 | 0 | 1 | 1 | 0 | 1 | 0 | 1 | 0 | 0 |
+| write-compressor | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
+| **pass** | 12 | 10 | 13 | 11 | 15 | 14 | 11 | 12 | 11 | 12 |

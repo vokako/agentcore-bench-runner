@@ -1,10 +1,11 @@
 {
   "region": "us-east-2",
   "execution_role_arn": "arn:aws:iam::123456789012:role/bench-runner-exec",
-  "model_id": "us.anthropic.claude-sonnet-5",
+  "model_id": "global.anthropic.claude-sonnet-5-5",
   "results_bucket": "REPLACE-WITH-YOUR-BUCKET",
   "results_region": "us-east-2",
   "results_prefix": "bench",
+  "image_template": "123456789012.dkr.ecr.us-east-2.amazonaws.com/bench/{task}:arm64",
   "capacity_provider_arn": "arn:aws:bedrock-agentcore:us-east-2:123456789012:capacity-provider/REPLACE",
   "max_image_mb": 2000
 }
